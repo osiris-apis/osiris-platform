@@ -106,6 +106,39 @@ pub struct Manifest {
 }
 
 impl Manifest {
+    // Check whether a string is a valid identifier
+    //
+    // This verifies that the given string consists of only alphanumeric
+    // characters, plus underscores, but does not start with a digit. This is a
+    // common rule for identifiers in programming languages.
+    //
+    // Any unicode alpha/numeric character is allowed.
+    fn is_identifier(s: &str) -> bool {
+        let mut iter = s.chars();
+        let first = iter.next();
+
+        first.is_some_and(|v| v.is_alphabetic() || v == '_')
+            && iter.all(|v| v.is_alphanumeric() || v == '_')
+    }
+
+    // Check whether a string contains no quotes or escapes
+    //
+    // This verifies that a string does not contain quotes or backslashes, nor
+    // any control characters.
+    //
+    // We use this as a simple way to guarantee that the strings can be
+    // interpolated into a wide range of configuration languages. Preferably,
+    // we would escape them properly in each target language, but that has not
+    // been done, yet.
+    fn is_quotable(s: &str) -> bool {
+        s.chars().all(
+            |v| !v.is_control()
+                && v != '\\'
+                && v != '\''
+                && v != '"'
+        )
+    }
+
     /// Parse manifest from raw
     ///
     /// Take a raw representation of the manifest and perform post-parsing
@@ -122,23 +155,57 @@ impl Manifest {
             return Err(());
         }
 
-        // Verify that the application ID, if provided, is a valid identifier.
-        // The allowed character-set is alphanumeric and underscores, but not
-        // starting with a digit. The full unicode set is allowed.
-        if raw.application.as_ref().is_some_and(
-            |v| v.id.as_ref().is_some_and(
-                |v| {
-                    let mut iter = v.chars();
-                    let first = iter.next();
-
-                    !(
-                        first.is_some_and(|v| v.is_alphabetic() || v == '_')
-                        && iter.all(|v| v.is_alphanumeric() || v == '_')
-                    )
+        if let Some(application) = &raw.application {
+            // Verify that the application name does not contain quotes or
+            // backslashes, to avoid having to escape it in configuration.
+            if let Some(v) = &application.name {
+                if !Self::is_quotable(&v) {
+                    return Err(());
                 }
-            )
-        ) {
-            return Err(());
+            }
+
+            // Verify that the application ID, if provided, is a valid
+            // identifier. The allowed character-set is alphanumeric and
+            // underscores, but not starting with a digit. The full unicode set
+            // is allowed.
+            if let Some(v) = &application.id {
+                if !Self::is_identifier(&v) {
+                    return Err(());
+                }
+            }
+        }
+
+        if let Some(platform) = &raw.platform {
+            if let Some(android) = &platform.android {
+                // Ensure application IDs can be put in quotes.
+                if let Some(v) = &android.application_id {
+                    if !Self::is_quotable(&v) {
+                        return Err(());
+                    }
+                }
+
+                // Ensure namespaces can be put in quotes.
+                if let Some(v) = &android.namespace {
+                    if !Self::is_quotable(&v) {
+                        return Err(());
+                    }
+                }
+
+                // Ensure version names can be put in quotes.
+                if let Some(v) = &android.version_name {
+                    if !Self::is_quotable(&v) {
+                        return Err(());
+                    }
+                }
+
+                // Verify that the SDK path does not contain new-lines nor
+                // control characters.
+                if let Some(sdk_path) = &android.sdk_path {
+                    if !sdk_path.chars().all(|v| !v.is_control() && v != '\n') {
+                        return Err(());
+                    }
+                }
+            }
         }
 
         Ok(
@@ -167,6 +234,20 @@ impl Manifest {
         std::fs::read_to_string(path)
             .map_err(|_| ())
             .and_then(|v| Self::parse_str(&v))
+    }
+
+    /// Return `raw.platform.path` or its default
+    ///
+    /// Return the configured platform path, or its default value if any part
+    /// of the configuration is missing.
+    pub fn platform_path(&self) -> &str {
+        if let Some(platform) = &self.raw.platform {
+            if let Some(path) = &platform.path {
+                return path.as_str();
+            }
+        }
+
+        "./platform"
     }
 }
 
@@ -239,6 +320,30 @@ mod tests {
         assert_eq!(m.raw.platform.unwrap().path.unwrap(), "./platform");
     }
 
+    // Verify parsing of manifest application names
+    //
+    // Application names use a restrictive character set. Verify the validator
+    // and ensure invalid characters are refused.
+    #[test]
+    fn manifest_parse_application_name() {
+        let s = "
+            version = 1
+            [application]
+            name = \"Foo Bar\"
+        ";
+
+        let m = Manifest::parse_str(s).unwrap();
+        assert_eq!(m.raw.application.unwrap().name.unwrap(), "Foo Bar");
+
+        let s = "
+            version = 1
+            [application]
+            name = \"Foo\"Bar\"
+        ";
+
+        assert!(Manifest::parse_str(s).is_err());
+    }
+
     // Verify parsing of manifest application ids
     //
     // Application IDs use a restrictive character set. Verify the validator
@@ -253,5 +358,37 @@ mod tests {
 
         let m = Manifest::parse_str(s).unwrap();
         assert_eq!(m.raw.application.unwrap().id.unwrap(), "_foobar0");
+
+        let s = "
+            version = 1
+            [application]
+            id = \"0foobar\"
+        ";
+
+        assert!(Manifest::parse_str(s).is_err());
+    }
+
+    // Verify parsing of android platform sdk-paths
+    //
+    // The manifest verifies that these paths cannot contain newlines. No
+    // further verification is currently performed.
+    #[test]
+    fn manifest_parse_platform_android_sdk_path() {
+        let s = "
+            version = 1
+            [platform.android]
+            sdk-path = \"./some/path\"
+        ";
+
+        let m = Manifest::parse_str(s).unwrap();
+        assert_eq!(m.raw.platform.unwrap().android.unwrap().sdk_path.unwrap(), "./some/path");
+
+        let s = "
+            version = 1
+            [platform.android]
+            sdk-path = \"./some\npath\"
+        ";
+
+        assert!(Manifest::parse_str(s).is_err());
     }
 }

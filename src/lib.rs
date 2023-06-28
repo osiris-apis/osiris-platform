@@ -71,10 +71,58 @@
 
 pub mod manifest;
 
+/// Platform Operations
+///
+/// The `op` module is a collection of all operations that can be performed via
+/// the command-line interface. Each operation is implemented in a submodule
+/// and can be used independently.
+pub mod op {
+    pub mod emerge;
+}
+
 /// Platform Integration
 ///
 /// The `platform` module documents how rust applications can be integrated
 /// into native applications for each respective platform.
 pub mod platform {
     pub mod android;
+
+    /// Platform Identifier
+    ///
+    /// This enum is an enumeration of supported platforms. It implements
+    /// `FromStr` to allow creation from string representation. Use `as_str()`
+    /// to get a static string-representation back.
+    #[derive(Clone, Copy, Debug)]
+    pub enum Id {
+        Android,
+    }
+
+    impl Id {
+        /// Get string representation
+        ///
+        /// Return the string representation of the platform identifier. This
+        /// is guaranteed to be parsable by the `FromStr` implementation.
+        pub fn as_str(&self) -> &'static str {
+            match self {
+                Id::Android => "android",
+            }
+        }
+    }
+
+    // Parse platform identifiers from strings
+    //
+    // This implements `FromStr` to allow using `std::str::parse()` and thus
+    // get platform identifiers from their respective string representation.
+    // Note that this uses case-insensitive matching.
+    impl std::str::FromStr for Id {
+        type Err = ();
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            if s.eq_ignore_ascii_case("android") {
+                Ok(Self::Android)
+            } else {
+                Err(())
+            }
+        }
+    }
 }
