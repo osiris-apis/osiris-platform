@@ -176,9 +176,12 @@ fn emerge_android_local_properties(
 //
 //  * Configure the Gradle module resolution behavior and specify which module
 //    registries are used.
+//
+//  * Configure the root project name. This is used in file-names for build
+//    artifacts.
 fn emerge_android_settings_gradle(
     path: &mut std::path::PathBuf,
-    name: &str,
+    appid: &str,
 ) -> Result<(), Error> {
     let content = format!(
         concat!(
@@ -200,7 +203,7 @@ fn emerge_android_settings_gradle(
             "rootProject.name = '{0}'\n",
         ),
         // Manifest verified: no quotes or backslashes
-        name,
+        appid,
     );
     path.push("settings.gradle");
     update_file(path.as_path(), content.as_str())?;
@@ -532,7 +535,7 @@ fn emerge_android(
 
     emerge_android_gradle_properties(&mut path)?;
     emerge_android_local_properties(&mut path, manifest_android_sdk_path)?;
-    emerge_android_settings_gradle(&mut path, &manifest_application_name)?;
+    emerge_android_settings_gradle(&mut path, &manifest_application_id)?;
     emerge_android_build_gradle(
         &mut path,
         &manifest_android_application_id,
