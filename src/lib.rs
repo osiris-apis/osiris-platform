@@ -69,6 +69,7 @@
 //!  * Web (WIP)
 //!  * Windows (WIP)
 
+pub mod cargo;
 pub mod manifest;
 
 /// Platform Operations
