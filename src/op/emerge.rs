@@ -256,7 +256,7 @@ fn emerge_android_build_gradle(
             "\n",
             "dependencies {{\n",
             "    implementation 'androidx.appcompat:appcompat:1.6.1'\n",
-            "    implementation 'com.google.android.material:material:1.5.0'\n",
+            "    implementation 'com.google.android.material:material:1.9.0'\n",
             "    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'\n",
             "    testImplementation 'junit:junit:4.13.2'\n",
             "    androidTestImplementation 'androidx.test.ext:junit:1.1.5'\n",
