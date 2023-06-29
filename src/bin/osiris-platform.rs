@@ -56,6 +56,19 @@ impl Cli {
         );
 
         cmd = cmd.subcommand(
+            clap::Command::new("build")
+                .about("Build artifacts for the specified platform")
+                .arg(
+                    clap::Arg::new("platform")
+                        .long("platform")
+                        .value_name("NAME")
+                        .help("Name of the target platform to operate on")
+                        .required(true)
+                        .value_parser(arg_platform_id)
+                )
+        );
+
+        cmd = cmd.subcommand(
             clap::Command::new("emerge")
                 .about("Create a persisting platform integration")
                 .arg(
@@ -102,6 +115,89 @@ impl Cli {
             },
             Ok(v) => {
                 Ok(v)
+            },
+        }
+    }
+
+    fn metadata(
+        &self,
+    ) -> Result<osiris_platform::cargo::Metadata, u8> {
+        // Query cargo for its metadata via `cargo metadata`.
+        match osiris_platform::cargo::Metadata::cargo() {
+            Err(osiris_platform::cargo::Error::Standalone) => {
+                eprintln!("Cannot query cargo metadata: Not running as cargo sub-command");
+                Err(1)
+            },
+            Err(osiris_platform::cargo::Error::Exec(error)) => {
+                eprintln!("Cannot query cargo metadata: Execution of cargo could not commence ({})", error);
+                Err(1)
+            },
+            Err(osiris_platform::cargo::Error::Cargo) => {
+                eprintln!("Cannot query cargo metadata: Cargo failed executing");
+                Err(1)
+            },
+            Err(osiris_platform::cargo::Error::Unicode(error)) => {
+                eprintln!("Cannot query cargo metadata: Cargo returned invalid unicode data ({})", error);
+                Err(1)
+            },
+            Err(osiris_platform::cargo::Error::Json) => {
+                eprintln!("Cannot query cargo metadata: Cargo returned invalid JSON data");
+                Err(1)
+            },
+            Err(osiris_platform::cargo::Error::Data) => {
+                eprintln!("Cannot query cargo metadata: Cargo metadata lacks required fields");
+                Err(1)
+            },
+            Ok(v) => {
+                Ok(v)
+            },
+        }
+    }
+
+    fn op_build(
+        &self,
+        m: &clap::ArgMatches,
+        m_op: &clap::ArgMatches,
+    ) -> Result<(), u8> {
+        let manifest = self.manifest(m)?;
+        let metadata = self.metadata()?;
+        let platform = *m_op.get_one("platform").expect("Platform-flag lacks a value");
+
+        match osiris_platform::op::build::build(
+            &manifest,
+            &metadata,
+            platform,
+        ) {
+            Err(osiris_platform::op::build::Error::ManifestKey(key)) => {
+                eprintln!("Cannot build platform integration: Manifest configuration missing '{}'", key);
+                Err(1)
+            },
+            Err(osiris_platform::op::build::Error::PlatformDirectory(dir)) => {
+                eprintln!("Cannot build platform integration: Failed to access platform directory {:?}", dir);
+                Err(1)
+            },
+            Err(osiris_platform::op::build::Error::DirectoryCreation(dir)) => {
+                eprintln!("Cannot build platform integration: Failed to create directory {:?}", dir);
+                Err(1)
+            },
+            Err(osiris_platform::op::build::Error::FileUpdate(file, error)) => {
+                eprintln!("Cannot build platform integration: Failed to update {:?} ({})", file, error);
+                Err(1)
+            },
+            Err(osiris_platform::op::build::Error::FileRemoval(file, error)) => {
+                eprintln!("Cannot build platform integration: Failed to remove {:?} ({})", file, error);
+                Err(1)
+            },
+            Err(osiris_platform::op::build::Error::Exec(cmd, error)) => {
+                eprintln!("Cannot build platform integration: Failed to invoke '{}' ({})", cmd, error);
+                Err(1)
+            },
+            Err(osiris_platform::op::build::Error::Build) => {
+                eprintln!("Cannot build platform integration: Platform build failed");
+                Err(1)
+            },
+            Ok(_) => {
+                Ok(())
             },
         }
     }
@@ -173,6 +269,7 @@ impl Cli {
         }
 
         match m.subcommand() {
+            Some(("build", m_op)) => self.op_build(&m, &m_op),
             Some(("emerge", m_op)) => self.op_emerge(&m, &m_op),
             _ => std::unreachable!(),
         }

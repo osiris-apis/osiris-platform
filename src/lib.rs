@@ -78,6 +78,7 @@ pub mod manifest;
 /// the command-line interface. Each operation is implemented in a submodule
 /// and can be used independently.
 pub mod op {
+    pub mod build;
     pub mod emerge;
 }
 
