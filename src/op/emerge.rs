@@ -23,6 +23,22 @@ pub enum Error {
     FileRemoval(std::ffi::OsString, std::io::Error),
 }
 
+// Ensure directory exists
+//
+// Make sure the directory at the given path exists. Create the directory and
+// its parent directories if necessary.
+//
+// This is a convenience helper around `std::fs::create_dir_all()`, but
+// returning the local error `Error::DirectoryCreation` on failure.
+fn ensure_dir(
+    path: &std::path::Path,
+) -> Result<(), Error> {
+    std::fs::create_dir_all(path)
+        .map_err(
+            |_| Error::DirectoryCreation(path.as_os_str().to_os_string())
+        )
+}
+
 // Update a file if required
 //
 // This writes the given content to the specified file, but only if the file
@@ -389,20 +405,14 @@ pub fn emerge(
     } else {
         path.push(manifest.platform_path());
     }
-    std::fs::create_dir_all(path.as_path())
-        .map_err(
-            |_| Error::DirectoryCreation(path.as_os_str().to_os_string())
-        )?;
+    ensure_dir(path.as_path())?;
 
     // Create the platform-specific base directory. If updates are not allowed,
     // we ensure that we fail if the directory already exists. Otherwise, we
     // allow updates and proceed even with existing base directories.
     path.push(platform.as_str());
     if update {
-        std::fs::create_dir_all(path.as_path())
-            .map_err(
-                |_| Error::DirectoryCreation(path.as_os_str().to_os_string()),
-            )?;
+        ensure_dir(path.as_path())?;
     } else {
         std::fs::create_dir(path.as_path())
             .map_err(
