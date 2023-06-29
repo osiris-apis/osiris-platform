@@ -214,7 +214,7 @@ fn emerge_android_settings_gradle(
 // to build, using the Groovy configuration language.
 fn emerge_android_build_gradle(
     path: &mut std::path::PathBuf,
-    application_id: &str,
+    android_application_id: &str,
     namespace: &str,
     compile_sdk: u32,
     min_sdk: u32,
@@ -263,7 +263,7 @@ fn emerge_android_build_gradle(
             "}}\n",
         ),
         // Manifest verified: no quotes or backslashes
-        application_id,
+        android_application_id,
         // Manifest verified: no quotes or backslashes
         namespace,
         compile_sdk,
