@@ -33,14 +33,14 @@ jobs:
       uses: actions/configure-pages@v3
     - name: "Prepare build"
       shell: "bash"
-      runs: mkdir "./pages"
+      run: mkdir "./pages"
 
     - name: "Build Rust Documentation"
       uses: osiris-apis/plumbing/lib/actions/cargo-doc
 
     - name: "Assemble Pages"
       shell: "bash"
-      runs: cp -r "./target/doc" "./pages/doc"
+      run: cp -r "./target/doc" "./pages/doc"
     - name: "Upload pages"
       uses: actions/upload-pages-artifact@v1
       with:
