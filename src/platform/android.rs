@@ -42,7 +42,7 @@
 //! However, for applications targetting multiple platforms, the recommended
 //! application layout is:
 //!
-//! ```ignore
+//! ```text
 //! <app>/
 //! ├── Cargo.toml
 //! ├── osiris-platform.toml
