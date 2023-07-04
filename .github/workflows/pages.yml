@@ -36,7 +36,7 @@ jobs:
       run: mkdir "./pages"
 
     - name: "Build Rust Documentation"
-      uses: osiris-apis/plumbing/lib/actions/cargo-doc
+      uses: osiris-apis/plumbing/lib/actions/cargo-doc@main
 
     - name: "Assemble Pages"
       shell: "bash"
