@@ -31,9 +31,7 @@ jobs:
 
     - name: "Assemble Pages"
       shell: "bash"
-      run: |
-        rm -f "./target/doc/.lock"
-        cp -r "./target/doc" "./pages/doc"
+      run: cp -r "./target/doc" "./pages/doc"
     - name: "Upload pages"
       uses: actions/upload-pages-artifact@v1
       with:
