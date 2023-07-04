@@ -1,4 +1,4 @@
-name: "Project Pages"
+name: "Github Pages"
 
 on:
   pull_request:
@@ -9,7 +9,7 @@ on:
 
 concurrency:
   cancel-in-progress: false
-  group: "pages"
+  group: "github-pages"
 
 jobs:
   build:
@@ -40,10 +40,10 @@ jobs:
         path: './pages'
 
   deploy:
-    name: "Deploy Project Pages"
+    name: "Deploy Pages to Github"
 
     environment:
-      name: "pages"
+      name: "github-pages"
       url: ${{ steps.deploy.outputs.page_url }}
 
     if: github.event_name == 'workflow_dispatch'
