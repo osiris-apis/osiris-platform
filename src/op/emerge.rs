@@ -615,11 +615,16 @@ pub fn emerge(
     // the manifest. However, an override can be provided by the caller, in
     // which case we root the entire platform directory in an alternative base
     // directory. This is useful to emerge into ephemeral build directories.
-    if let Some(path_base) = path_override {
-        path.push(path_base);
+    let platform_path = if let Some(path_base) = path_override {
+        path_base
     } else {
-        path.push(manifest.platform_path());
-    }
+        std::path::Path::new(
+            std::ffi::OsStr::new(
+                manifest.platform_path(),
+            ),
+        )
+    };
+    path.push(platform_path);
     ensure_dir(path.as_path())?;
 
     // Create the platform-specific base directory. If updates are not allowed,
