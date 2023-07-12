@@ -326,9 +326,9 @@ fn emerge_android_manifest(
 
 // Emerge Android `activity_main.xml`
 //
-// The main activity layout is commonly called `activity_main.xml`, defining
-// the Android-style UI layout of the activity. This is referenced by the
-// main activity and set as default UI layout.
+// This is the layout used by the main activity, defining the UI elements and
+// their relations. This is referenced by `MainActivity` and used as default
+// layout.
 //
 // This is a simple full-widget layout with a text-box showing "Hello World!".
 fn emerge_android_activity_main(
