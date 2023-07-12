@@ -127,7 +127,7 @@ pub fn build(
             )?;
 
         match crate::op::emerge::emerge(
-            &manifest,
+            manifest,
             platform,
             Some(path_platform.as_path()),
             true,
