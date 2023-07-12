@@ -27,6 +27,8 @@ pub enum Error {
 // Android-specific backend to `build()`.
 fn build_android(
     _manifest: &crate::manifest::Manifest,
+    _platform: &crate::manifest::RawPlatform,
+    _android: &crate::manifest::RawPlatformAndroid,
     path_platform: std::path::PathBuf,
     mut path_build: std::path::PathBuf,
 ) -> Result<(), Error> {
@@ -86,15 +88,14 @@ fn build_android(
 pub fn build(
     manifest: &crate::manifest::Manifest,
     metadata: &crate::cargo::Metadata,
-    platform: crate::platform::Id,
+    platform: &crate::manifest::RawPlatform,
 ) -> Result<(), Error> {
     let mut path_platform = std::path::PathBuf::new();
     let mut path_build = std::path::PathBuf::new();
 
     // Check for `./platform/<id>/` to exist and being accessible. Use the
     // path as specified in the manifest.
-    path_platform.push(manifest.platform_path());
-    path_platform.push(platform.as_str());
+    path_platform.push(platform.path());
     let accessible = match std::fs::metadata(&path_platform) {
         Err(v) => {
             if v.kind() == std::io::ErrorKind::NotFound {
@@ -116,15 +117,15 @@ pub fn build(
     // and emerge ephemeral platform integration into it. The directory is
     // created at `<target>/osiris/platform/<platform>/`.
     if !accessible {
-        path_platform.pop();
+        path_platform.clear();
         path_platform.push(&metadata.target_directory);
         path_platform.push("osiris");
         path_platform.push("platform");
+        path_platform.push(&platform.id);
 
-        std::fs::create_dir_all(path_platform.as_path())
-            .map_err(
-                |_| Error::DirectoryCreation(path_platform.as_os_str().to_os_string())
-            )?;
+        std::fs::create_dir_all(path_platform.as_path()).map_err(
+            |_| Error::DirectoryCreation(path_platform.as_os_str().to_os_string())
+        )?;
 
         match crate::op::emerge::emerge(
             manifest,
@@ -138,6 +139,9 @@ pub fn build(
             Err(crate::op::emerge::Error::ManifestKey(key)) => {
                 return Err(Error::ManifestKey(key));
             },
+            Err(crate::op::emerge::Error::PlatformDirectory(dir)) => {
+                return Err(Error::PlatformDirectory(dir));
+            },
             Err(crate::op::emerge::Error::DirectoryCreation(dir)) => {
                 return Err(Error::DirectoryCreation(dir));
             },
@@ -150,8 +154,6 @@ pub fn build(
             Ok(_) => {
             },
         }
-
-        path_platform.push(platform.as_str());
     }
 
     // Create a build directory for all output artifacts of the build process.
@@ -160,15 +162,17 @@ pub fn build(
     path_build.push(&metadata.target_directory);
     path_build.push("osiris");
     path_build.push("build");
-    path_build.push(platform.as_str());
-    std::fs::create_dir_all(path_build.as_path())
-        .map_err(
-            |_| Error::DirectoryCreation(path_build.as_os_str().to_os_string())
-        )?;
+    path_build.push(&platform.id);
+    std::fs::create_dir_all(path_build.as_path()).map_err(
+        |_| Error::DirectoryCreation(path_build.as_os_str().to_os_string())
+    )?;
 
     // Invoke the platform-dependent handler. Grant the path-buffers to it, so
     // it can reuse it for further operations.
-    match platform {
-        crate::platform::Id::Android => build_android(manifest, path_platform, path_build),
+    match platform.configuration {
+        Some(crate::manifest::RawPlatformConfiguration::Android(ref v)) => {
+            build_android(manifest, platform, v, path_platform, path_build)
+        },
+        None => Ok(()),
     }
 }

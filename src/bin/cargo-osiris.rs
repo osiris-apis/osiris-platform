@@ -22,19 +22,6 @@ struct Cli {
     cmd: clap::Command,
 }
 
-fn arg_platform_id(
-    s: &str,
-) -> Result<osiris_platform::platform::Id, clap::error::Error> {
-    s.parse().map_err(
-        |_| {
-            clap::error::Error::raw(
-                clap::error::ErrorKind::ValueValidation,
-                "Invalid platform identifier",
-            )
-        }
-    )
-}
-
 impl Cli {
     fn new() -> Self {
         let mut cmd;
@@ -62,9 +49,9 @@ impl Cli {
                     clap::Arg::new("platform")
                         .long("platform")
                         .value_name("NAME")
-                        .help("Name of the target platform to operate on")
+                        .help("ID of the target platform to operate on")
                         .required(true)
-                        .value_parser(arg_platform_id)
+                        .value_parser(clap::builder::ValueParser::string())
                 )
         );
 
@@ -75,9 +62,9 @@ impl Cli {
                     clap::Arg::new("platform")
                         .long("platform")
                         .value_name("NAME")
-                        .help("Name of the target platform to operate on")
+                        .help("ID of the target platform to operate on")
                         .required(true)
-                        .value_parser(arg_platform_id)
+                        .value_parser(clap::builder::ValueParser::string())
                 )
                 .arg(
                     clap::Arg::new("update")
@@ -154,6 +141,22 @@ impl Cli {
         }
     }
 
+    fn platform<'manifest>(
+        &self,
+        m: &clap::ArgMatches,
+        manifest: &'manifest osiris_platform::manifest::Manifest,
+    ) -> Result<&'manifest osiris_platform::manifest::RawPlatform, u8> {
+        let id: &String = m.get_one("platform").expect("Cannot acquire platform ID");
+
+        match manifest.raw.platform_by_id(id) {
+            Some(v) => Ok(v),
+            None => {
+                eprintln!("No platform with ID {}", id);
+                Err(1)
+            },
+        }
+    }
+
     fn op_build(
         &self,
         m: &clap::ArgMatches,
@@ -161,7 +164,7 @@ impl Cli {
     ) -> Result<(), u8> {
         let manifest = self.manifest(m)?;
         let metadata = self.metadata()?;
-        let platform = *m_op.get_one("platform").expect("Platform-flag lacks a value");
+        let platform = self.platform(m_op, &manifest)?;
 
         match osiris_platform::op::build::build(
             &manifest,
@@ -208,7 +211,7 @@ impl Cli {
         m_op: &clap::ArgMatches,
     ) -> Result<(), u8> {
         let manifest = self.manifest(m)?;
-        let platform = *m_op.get_one("platform").expect("Platform-flag lacks a value");
+        let platform = self.platform(m_op, &manifest)?;
         let update = *m_op.get_one("update").expect("Update-flag lacks a value");
 
         match osiris_platform::op::emerge::emerge(
@@ -223,6 +226,10 @@ impl Cli {
             },
             Err(osiris_platform::op::emerge::Error::ManifestKey(key)) => {
                 eprintln!("Cannot emerge platform integration: Manifest configuration missing '{}'", key);
+                Err(1)
+            },
+            Err(osiris_platform::op::emerge::Error::PlatformDirectory(dir)) => {
+                eprintln!("Cannot emerge platform integration: Failed to access platform directory {:?}", dir);
                 Err(1)
             },
             Err(osiris_platform::op::emerge::Error::DirectoryCreation(dir)) => {

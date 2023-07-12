@@ -46,6 +46,12 @@ pub struct RawPlatformAndroid {
     pub sdk_path: Option<String>,
 }
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RawPlatformConfiguration {
+    Android(RawPlatformAndroid),
+}
+
 /// Raw Manifest Platform Table
 ///
 /// Sub-type of `Raw` representing the `Platform` table. This contains all
@@ -53,10 +59,13 @@ pub struct RawPlatformAndroid {
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RawPlatform {
+    /// Custom ID of the platform integration.
+    pub id: String,
     /// Path to the platform integration root relative from the manifest.
     pub path: Option<String>,
-    /// Android-platform specific configuration.
-    pub android: Option<RawPlatformAndroid>,
+    /// Platform specific configuration.
+    #[serde(flatten)]
+    pub configuration: Option<RawPlatformConfiguration>,
 }
 
 /// Raw Manifest Content
@@ -77,7 +86,8 @@ pub struct Raw {
     /// Application table specifying properties of the application itself.
     pub application: Option<RawApplication>,
     /// Platform table specifying all properties of the platform integration.
-    pub platform: Option<RawPlatform>,
+    #[serde(default)]
+    pub platform: Vec<RawPlatform>,
 }
 
 /// Manifest Abstraction
@@ -90,6 +100,32 @@ pub struct Manifest {
     pub raw: Raw,
 }
 
+impl RawPlatform {
+    /// Return Android Configuration
+    ///
+    /// Return a reference to the embedded android configuration, or `None`,
+    /// depending on whether the platform configuration is for Android.
+    pub fn android(&self) -> Option<&RawPlatformAndroid> {
+        if let Some(RawPlatformConfiguration::Android(v)) = self.configuration.as_ref() {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    /// Return `platform.path` or its default
+    ///
+    /// Return the configured platform path, or its default value if missing.
+    /// The default is `./platform/<id>` with `platform.id` as directory name.
+    pub fn path(&self) -> String {
+        if let Some(path) = self.path.as_ref() {
+            path.clone()
+        } else {
+            format!("./platform/{}", self.id)
+        }
+    }
+}
+
 impl Raw {
     fn parse_toml(table: toml::Table) -> Result<Self, ()> {
         <Self as serde::Deserialize>::deserialize(table)
@@ -100,6 +136,16 @@ impl Raw {
         content.parse::<toml::Table>()
             .map_err(|_| ())
             .and_then(|v| Self::parse_toml(v))
+    }
+
+    /// Find matching platform entry
+    ///
+    /// Search the platform entries for the first entry matching the specified
+    /// platform ID.
+    pub fn platform_by_id(&self, id: &str) -> Option<&RawPlatform> {
+        self.platform.iter().find(
+            |v| v.id == id
+        )
     }
 }
 
@@ -173,8 +219,8 @@ impl Manifest {
             }
         }
 
-        if let Some(platform) = &raw.platform {
-            if let Some(android) = &platform.android {
+        for platform in raw.platform.iter() {
+            if let Some(android) = platform.android() {
                 // Ensure application IDs can be put in quotes.
                 if let Some(v) = &android.application_id {
                     if !Self::is_quotable(&v) {
@@ -232,20 +278,6 @@ impl Manifest {
         std::fs::read_to_string(path)
             .map_err(|_| ())
             .and_then(|v| Self::parse_str(&v))
-    }
-
-    /// Return `raw.platform.path` or its default
-    ///
-    /// Return the configured platform path, or its default value if any part
-    /// of the configuration is missing.
-    pub fn platform_path(&self) -> &str {
-        if let Some(platform) = &self.raw.platform {
-            if let Some(path) = &platform.path {
-                return path.as_str();
-            }
-        }
-
-        "./platform"
     }
 }
 
@@ -306,16 +338,17 @@ mod tests {
         let s = "
             version = 1
             [application]
+            id = \"test\"
             path = \".\"
-            [platform]
-            path = \"./platform\"
+            [[platform]]
+            path = \"./platform/foobar\"
         ";
 
         let m = Manifest::parse_str(s).unwrap();
 
         assert_eq!(m.raw.version, 1);
         assert_eq!(m.raw.application.unwrap().path.unwrap(), ".");
-        assert_eq!(m.raw.platform.unwrap().path.unwrap(), "./platform");
+        assert_eq!(m.raw.platform[0].path.as_ref().unwrap(), "./platform/foobar");
     }
 
     // Verify parsing of manifest application names
@@ -374,15 +407,19 @@ mod tests {
     fn manifest_parse_platform_android_sdk_path() {
         let s = "
             version = 1
+            [[platform]]
+            id = \"test\"
             [platform.android]
             sdk-path = \"./some/path\"
         ";
 
         let m = Manifest::parse_str(s).unwrap();
-        assert_eq!(m.raw.platform.unwrap().android.unwrap().sdk_path.unwrap(), "./some/path");
+        assert_eq!(m.raw.platform[0].android().unwrap().sdk_path.as_ref().unwrap(), "./some/path");
 
         let s = "
             version = 1
+            [[platform]]
+            id = \"test\"
             [platform.android]
             sdk-path = \"./some\npath\"
         ";

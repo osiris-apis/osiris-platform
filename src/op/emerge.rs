@@ -15,6 +15,8 @@ pub enum Error {
     Already,
     /// Specified key required but missing in manifest.
     ManifestKey(String),
+    /// Cannot access the specified platform directory.
+    PlatformDirectory(std::ffi::OsString),
     /// Creation of the directory at the specified path failed.
     DirectoryCreation(std::ffi::OsString),
     /// Updating the file at the specified path failed with the given error.
@@ -449,6 +451,8 @@ fn emerge_android_main_activity(
 // Android-specific backend to `emerge()`.
 fn emerge_android(
     manifest: &crate::manifest::Manifest,
+    _platform: &crate::manifest::RawPlatform,
+    android: &crate::manifest::RawPlatformAndroid,
     mut path: std::path::PathBuf,
 ) -> Result<(), Error> {
     // Fetch manifest keys.
@@ -472,33 +476,30 @@ fn emerge_android(
             manifest_application_id = Some(v);
         }
     }
-    if let Some(platform) = &manifest.raw.platform {
-        if let Some(android) = &platform.android {
-            if let Some(v) = &android.application_id {
-                manifest_android_application_id = Some(v);
-            }
-            if let Some(v) = &android.namespace {
-                manifest_android_namespace = Some(v);
-            }
-            if let Some(v) = android.compile_sdk {
-                manifest_android_compile_sdk = Some(v);
-            }
-            if let Some(v) = android.min_sdk {
-                manifest_android_min_sdk = Some(v);
-            }
-            if let Some(v) = android.target_sdk {
-                manifest_android_target_sdk = Some(v);
-            }
-            if let Some(v) = android.version_code {
-                manifest_android_version_code = Some(v);
-            }
-            if let Some(v) = &android.version_name {
-                manifest_android_version_name = Some(v);
-            }
-            if let Some(v) = &android.sdk_path {
-                manifest_android_sdk_path = Some(v);
-            }
-        }
+
+    if let Some(v) = &android.application_id {
+        manifest_android_application_id = Some(v);
+    }
+    if let Some(v) = &android.namespace {
+        manifest_android_namespace = Some(v);
+    }
+    if let Some(v) = android.compile_sdk {
+        manifest_android_compile_sdk = Some(v);
+    }
+    if let Some(v) = android.min_sdk {
+        manifest_android_min_sdk = Some(v);
+    }
+    if let Some(v) = android.target_sdk {
+        manifest_android_target_sdk = Some(v);
+    }
+    if let Some(v) = android.version_code {
+        manifest_android_version_code = Some(v);
+    }
+    if let Some(v) = &android.version_name {
+        manifest_android_version_name = Some(v);
+    }
+    if let Some(v) = &android.sdk_path {
+        manifest_android_sdk_path = Some(v);
     }
 
     // Unwrap required keys.
@@ -609,44 +610,50 @@ fn emerge_android(
 /// deleted.
 pub fn emerge(
     manifest: &crate::manifest::Manifest,
-    platform: crate::platform::Id,
+    platform: &crate::manifest::RawPlatform,
     path_override: Option<&std::path::Path>,
     update: bool,
 ) -> Result<(), Error> {
+    let v_platform_path;
     let mut path = std::path::PathBuf::new();
 
-    // Create the platform directory. By default, we use the path specified in
-    // the manifest. However, an override can be provided by the caller, in
-    // which case we root the entire platform directory in an alternative base
-    // directory. This is useful to emerge into ephemeral build directories.
+    // By default, we use the path specified in the manifest as platform
+    // directory. However, an override can be provided by the caller. This
+    // is useful to emerge into ephemeral build directories.
     let platform_path = if let Some(path_base) = path_override {
         path_base
     } else {
-        std::path::Path::new(
-            std::ffi::OsStr::new(
-                manifest.platform_path(),
-            ),
-        )
+        v_platform_path = platform.path();
+        v_platform_path.as_ref()
     };
-    path.push(platform_path);
-    ensure_dir(path.as_path())?;
 
-    // Create the platform-specific base directory. If updates are not allowed,
-    // we ensure that we fail if the directory already exists. Otherwise, we
-    // allow updates and proceed even with existing base directories.
-    path.push(platform.as_str());
-    if update {
-        ensure_dir(path.as_path())?;
-    } else {
-        std::fs::create_dir(path.as_path())
-            .map_err(
-                |_| Error::Already,
-            )?;
-    }
+    // Check for the platform path to exist and being accessible. If the path
+    // points to something other than a directory, we fail with an error. If
+    // the path points to an existing directory and updates are not allowed,
+    // we fail. Otherwise, we create the path and continue.
+    path.push(platform_path);
+    match std::fs::metadata(&path) {
+        Ok(v) => {
+            if !v.is_dir() {
+                return Err(Error::PlatformDirectory(path.as_os_str().to_os_string()));
+            } else if !update {
+                return Err(Error::Already);
+            }
+        },
+        Err(v) => {
+            if v.kind() != std::io::ErrorKind::NotFound {
+                return Err(Error::PlatformDirectory(path.as_os_str().to_os_string()));
+            }
+            ensure_dir(path.as_path())?;
+        },
+    };
 
     // Invoke the platform-dependent handler. Grant the path-buf to it, so it
     // can reuse it for further operations.
-    match platform {
-        crate::platform::Id::Android => emerge_android(manifest, path),
+    match platform.configuration {
+        Some(crate::manifest::RawPlatformConfiguration::Android(ref v)) => {
+            emerge_android(manifest, platform, v, path)
+        },
+        None => Ok(()),
     }
 }
