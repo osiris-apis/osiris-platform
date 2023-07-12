@@ -548,44 +548,48 @@ fn emerge_android(
     )?;
 
     path.push("src");
-    path.push("main");
     {
         ensure_dir(path.as_path())?;
-        emerge_android_manifest(&mut path, &manifest_application_id)?;
 
-        path.push("res");
+        path.push("main");
         {
             ensure_dir(path.as_path())?;
+            emerge_android_manifest(&mut path, &manifest_application_id)?;
 
-            path.push("layout");
+            path.push("res");
             {
                 ensure_dir(path.as_path())?;
-                emerge_android_activity_main(&mut path)?;
+
+                path.push("layout");
+                {
+                    ensure_dir(path.as_path())?;
+                    emerge_android_activity_main(&mut path)?;
+                }
+                path.pop();
+
+                path.push("values");
+                {
+                    ensure_dir(path.as_path())?;
+                    emerge_android_strings(&mut path, &manifest_application_name)?;
+                    emerge_android_themes(&mut path, &manifest_application_id)?;
+                }
+                path.pop();
             }
             path.pop();
 
-            path.push("values");
+            path.push("java");
             {
-                ensure_dir(path.as_path())?;
-                emerge_android_strings(&mut path, &manifest_application_name)?;
-                emerge_android_themes(&mut path, &manifest_application_id)?;
+                // Create the java-style directory-tree based on the namespace.
+                let mut ns_path = path.as_path().join(
+                    manifest_android_namespace.replace(".", "/"),
+                );
+                ensure_dir(ns_path.as_path())?;
+                emerge_android_main_activity(&mut ns_path, manifest_android_namespace)?;
             }
             path.pop();
-        }
-        path.pop();
-
-        path.push("java");
-        {
-            // Create the java-style directory-tree based on the namespace.
-            let mut ns_path = path.as_path().join(
-                manifest_android_namespace.replace(".", "/"),
-            );
-            ensure_dir(ns_path.as_path())?;
-            emerge_android_main_activity(&mut ns_path, manifest_android_namespace)?;
         }
         path.pop();
     }
-    path.pop();
     path.pop();
 
     Ok(())
