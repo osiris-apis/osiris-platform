@@ -21,8 +21,6 @@ pub struct RawApplication {
     /// Identifier of the application based on the name (alphanumeric
     /// with underscores allowed, but not starting with a digit).
     pub id: Option<String>,
-    /// Reverse-domain used by the application as namespace.
-    pub reverse_domain: Option<String>,
 }
 
 /// Android-Platform Table
