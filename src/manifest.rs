@@ -82,6 +82,16 @@ pub struct Raw {
     pub platform: Option<RawPlatform>,
 }
 
+/// Manifest Abstraction
+///
+/// This type represents a valid and verified manifest. The manifest content
+/// can be directly accessed via the `raw` field. The data is verified for
+/// semantic correctness (unlike the `Raw` type).
+pub struct Manifest {
+    /// Raw manifest content as parsed by the TOML module.
+    pub raw: Raw,
+}
+
 impl Raw {
     fn parse_toml(table: toml::Table) -> Result<Self, ()> {
         <Self as serde::Deserialize>::deserialize(table)
@@ -93,16 +103,6 @@ impl Raw {
             .map_err(|_| ())
             .and_then(|v| Self::parse_toml(v))
     }
-}
-
-/// Manifest Abstraction
-///
-/// This type represents a valid and verified manifest. The manifest content
-/// can be directly accessed via the `raw` field. The data is verified for
-/// semantic correctness (unlike the `Raw` type).
-pub struct Manifest {
-    /// Raw manifest content as parsed by the TOML module.
-    pub raw: Raw,
 }
 
 impl Manifest {
