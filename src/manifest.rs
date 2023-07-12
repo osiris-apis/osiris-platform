@@ -16,9 +16,9 @@ use toml;
 pub struct RawApplication {
     /// Path to the application root relative from the manifest.
     pub path: Option<String>,
-    /// Human-readable short-name of the application.
+    /// Human-readable name of the application.
     pub name: Option<String>,
-    /// Identifier of the application based on the short-name (alphanumeric
+    /// Identifier of the application based on the name (alphanumeric
     /// with underscores allowed, but not starting with a digit).
     pub id: Option<String>,
     /// Reverse-domain used by the application as namespace.
