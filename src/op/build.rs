@@ -139,7 +139,10 @@ fn build_android(
         &view_application.name,
     );
 
+    //
     // Write `osiris.android.*` properties.
+    //
+
     cmd_gradle_project_prop(
         &mut cmd,
         "osiris.android.applicationId",
@@ -150,6 +153,7 @@ fn build_android(
         "osiris.android.namespace",
         &view_android.namespace,
     );
+
     cmd_gradle_project_prop(
         &mut cmd,
         "osiris.android.compileSdk",
@@ -165,6 +169,7 @@ fn build_android(
         "osiris.android.targetSdk",
         &view_android.target_sdk.to_string(),
     );
+
     cmd_gradle_project_prop(
         &mut cmd,
         "osiris.android.versionCode",
@@ -176,7 +181,10 @@ fn build_android(
         &view_android.version_name,
     );
 
+    //
     // Write `osiris.metadata.*` properties.
+    //
+
     cmd_gradle_project_prop(
         &mut cmd,
         "osiris.metadata.targetDirectory",
