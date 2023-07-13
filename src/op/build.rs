@@ -63,10 +63,10 @@ fn build_android(
 
     cmd.arg("build");
 
-    cmd.arg("--no-daemon");
     cmd.arg("--no-scan");
     cmd.arg("--no-watch-fs");
     cmd.arg("--parallel");
+    cmd.arg("--quiet");
 
     cmd.arg("--project-dir");
     cmd.arg(path_platform.as_path());
