@@ -24,28 +24,61 @@ pub enum Error {
     Build,
 }
 
-fn cmd_gradle_project_prop(
+impl Error {
+    fn from_manifest_error_view(error: crate::manifest::ErrorView) -> Self {
+        match error {
+            crate::manifest::ErrorView::MissingKey(v) => Self::ManifestKey(v),
+        }
+    }
+}
+
+// Add Gradle `KEY=VALUE` to command-line.
+fn cmd_gradle_key_value(
     cmd: &mut std::process::Command,
     key: &str,
     value: &dyn std::convert::AsRef<std::ffi::OsStr>,
 ) {
     let mut arg = std::ffi::OsString::new();
 
-    cmd.arg("--project-prop");
     arg.push(key);
     arg.push("=");
     arg.push(value.as_ref());
     cmd.arg(arg);
 }
 
+// Add Gradle `--project-prop KEY=VALUE` to command-line.
+fn cmd_gradle_project_prop(
+    cmd: &mut std::process::Command,
+    key: &str,
+    value: &dyn std::convert::AsRef<std::ffi::OsStr>,
+) {
+    cmd.arg("--project-prop");
+    cmd_gradle_key_value(cmd, key, value)
+}
+
+// Add Gradle `--system-prop KEY=VALUE` to command-line.
+fn cmd_gradle_system_prop(
+    cmd: &mut std::process::Command,
+    key: &str,
+    value: &dyn std::convert::AsRef<std::ffi::OsStr>,
+) {
+    cmd.arg("--system-prop");
+    cmd_gradle_key_value(cmd, key, value)
+}
+
 // Android-specific backend to `build()`.
 fn build_android(
-    _manifest: &crate::manifest::Manifest,
+    manifest: &crate::manifest::Manifest,
     _platform: &crate::manifest::RawPlatform,
-    _android: &crate::manifest::RawPlatformAndroid,
+    android: &crate::manifest::RawPlatformAndroid,
     path_platform: std::path::PathBuf,
     mut path_build: std::path::PathBuf,
 ) -> Result<(), Error> {
+    let view_application = manifest.raw.view_application()
+        .map_err(Error::from_manifest_error_view)?;
+    let view_android = android.view(&manifest.raw)
+        .map_err(Error::from_manifest_error_view)?;
+
     // Invoke Gradle
     //
     // We simply invoke the gradle-build with the requested target. Since
@@ -61,6 +94,11 @@ fn build_android(
     let bin = "gradle".to_string();
     let mut cmd = std::process::Command::new(&bin);
 
+    // Set the SDK path via `ANDROID_HOME`. This is required by the Android SDK
+    // Gradle build. Alternatively, this can be set via `local.properties`, but
+    // Gradle has no official support for this, so we avoid it.
+    cmd.env("ANDROID_HOME", &view_android.sdk_path);
+
     cmd.arg("build");
 
     cmd.arg("--no-scan");
@@ -68,17 +106,67 @@ fn build_android(
     cmd.arg("--parallel");
     cmd.arg("--quiet");
 
+    // Tell Gradle the path to the platform integration.
     cmd.arg("--project-dir");
     cmd.arg(path_platform.as_path());
 
+    // Redirect the Gradle cache to the build directory to avoid polluting the
+    // source tree.
     path_build.push("gradle-cache");
     cmd.arg("--project-cache-dir");
     cmd.arg(path_build.as_path());
     path_build.pop();
 
+    // Redirect the Gradle `buildDir` to the build directory to avoid polluting
+    // the source tree.
     path_build.push("gradle-build");
     cmd_gradle_project_prop(&mut cmd, "buildDir", &path_build);
     path_build.pop();
+
+    // Write Gradle system-properties for early configuration. This is needed
+    // for these to be available in `settings.gradle`.
+    cmd_gradle_system_prop(
+        &mut cmd,
+        "osiris.system.name",
+        &view_application.name,
+    );
+
+    // Write `osiris.android.*` properties.
+    cmd_gradle_project_prop(
+        &mut cmd,
+        "osiris.android.applicationId",
+        &view_android.application_id,
+    );
+    cmd_gradle_project_prop(
+        &mut cmd,
+        "osiris.android.namespace",
+        &view_android.namespace,
+    );
+    cmd_gradle_project_prop(
+        &mut cmd,
+        "osiris.android.compileSdk",
+        &view_android.compile_sdk.to_string(),
+    );
+    cmd_gradle_project_prop(
+        &mut cmd,
+        "osiris.android.minSdk",
+        &view_android.min_sdk.to_string(),
+    );
+    cmd_gradle_project_prop(
+        &mut cmd,
+        "osiris.android.targetSdk",
+        &view_android.target_sdk.to_string(),
+    );
+    cmd_gradle_project_prop(
+        &mut cmd,
+        "osiris.android.versionCode",
+        &view_android.version_code.to_string(),
+    );
+    cmd_gradle_project_prop(
+        &mut cmd,
+        "osiris.android.versionName",
+        &view_android.version_name,
+    );
 
     cmd.stderr(std::process::Stdio::inherit());
     cmd.stdout(std::process::Stdio::inherit());
