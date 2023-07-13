@@ -340,6 +340,7 @@ mod tests {
             id = \"test\"
             path = \".\"
             [[platform]]
+            id = \"test\"
             path = \"./platform/foobar\"
         ";
 
