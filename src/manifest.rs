@@ -14,13 +14,15 @@ use toml;
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RawApplication {
-    /// Path to the application root relative from the manifest.
-    pub path: Option<String>,
+    /// Identifier of the application. Used to register and identify the
+    /// application. Must not change over the life of the application. Only
+    /// alphanumeric and `-`, `_` allowed. Non-ASCII allowed but might break
+    /// external tools.
+    pub id: Option<String>,
     /// Human-readable name of the application.
     pub name: Option<String>,
-    /// Identifier of the application based on the name (alphanumeric
-    /// with underscores allowed, but not starting with a digit).
-    pub id: Option<String>,
+    /// Path to the application root relative from the manifest.
+    pub path: Option<String>,
 }
 
 /// Android-Platform Table
@@ -63,6 +65,7 @@ pub struct RawPlatform {
     pub id: String,
     /// Path to the platform integration root relative from the manifest.
     pub path: Option<String>,
+
     /// Platform specific configuration.
     #[serde(flatten)]
     pub configuration: Option<RawPlatformConfiguration>,
@@ -153,16 +156,13 @@ impl Manifest {
     // Check whether a string is a valid identifier
     //
     // This verifies that the given string consists of only alphanumeric
-    // characters, plus underscores, but does not start with a digit. This is a
-    // common rule for identifiers in programming languages.
+    // characters plus `-`, `_`. Empty identifiers are rejected.
     //
     // Any unicode alpha/numeric character is allowed.
     fn is_identifier(s: &str) -> bool {
-        let mut iter = s.chars();
-        let first = iter.next();
-
-        first.is_some_and(|v| v.is_alphabetic() || v == '_')
-            && iter.all(|v| v.is_alphanumeric() || v == '_')
+        !s.is_empty() && s.chars().all(
+            |v| v.is_alphanumeric() || v == '-' || v == '_'
+        )
     }
 
     // Check whether a string contains no quotes or escapes
@@ -200,20 +200,19 @@ impl Manifest {
         }
 
         if let Some(application) = &raw.application {
-            // Verify that the application name does not contain quotes or
-            // backslashes, to avoid having to escape it in configuration.
-            if let Some(v) = &application.name {
-                if !Self::is_quotable(&v) {
+            // Verify that the application ID, if provided, is a valid
+            // identifier. The allowed character-set is alphanumeric plus `-`,
+            // `_`. Empty identifiers are not allowed.
+            if let Some(v) = &application.id {
+                if !Self::is_identifier(&v) {
                     return Err(());
                 }
             }
 
-            // Verify that the application ID, if provided, is a valid
-            // identifier. The allowed character-set is alphanumeric and
-            // underscores, but not starting with a digit. The full unicode set
-            // is allowed.
-            if let Some(v) = &application.id {
-                if !Self::is_identifier(&v) {
+            // Verify that the application name does not contain quotes or
+            // backslashes, to avoid having to escape it in configuration.
+            if let Some(v) = &application.name {
+                if !Self::is_quotable(&v) {
                     return Err(());
                 }
             }
@@ -393,7 +392,7 @@ mod tests {
         let s = "
             version = 1
             [application]
-            id = \"0foobar\"
+            id = \"\"
         ";
 
         assert!(Manifest::parse_str(s).is_err());
