@@ -347,6 +347,17 @@ impl Raw {
             |v| v.id == id
         )
     }
+
+    /// Create View of Application
+    ///
+    /// This calls `view()` on the `application` sub-structure, creating
+    /// suitable errors if the path to the sub-structure is missing.
+    pub fn view_application(&self) -> Result<ViewApplication, ErrorView> {
+        self.application
+            .as_ref()
+            .ok_or(ErrorView::MissingKey("application"))?
+            .view()
+    }
 }
 
 impl Manifest {
