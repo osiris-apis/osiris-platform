@@ -9,7 +9,7 @@
 /// operation. See each error for details.
 pub enum Error {
     /// Specified key required but missing in manifest.
-    ManifestKey(String),
+    ManifestKey(&'static str),
     /// Cannot access the specified platform directory.
     PlatformDirectory(std::ffi::OsString),
     /// Cannot create the specified build artifact directory.

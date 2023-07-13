@@ -14,7 +14,7 @@ pub enum Error {
     /// allowed by the caller.
     Already,
     /// Specified key required but missing in manifest.
-    ManifestKey(String),
+    ManifestKey(&'static str),
     /// Cannot access the specified platform directory.
     PlatformDirectory(std::ffi::OsString),
     /// Creation of the directory at the specified path failed.
