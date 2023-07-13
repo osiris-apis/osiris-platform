@@ -24,6 +24,20 @@ pub enum Error {
     Build,
 }
 
+fn cmd_gradle_project_prop(
+    cmd: &mut std::process::Command,
+    key: &str,
+    value: &dyn std::convert::AsRef<std::ffi::OsStr>,
+) {
+    let mut arg = std::ffi::OsString::new();
+
+    cmd.arg("--project-prop");
+    arg.push(key);
+    arg.push("=");
+    arg.push(value.as_ref());
+    cmd.arg(arg);
+}
+
 // Android-specific backend to `build()`.
 fn build_android(
     _manifest: &crate::manifest::Manifest,
@@ -63,11 +77,7 @@ fn build_android(
     path_build.pop();
 
     path_build.push("gradle-build");
-    let mut arg = std::ffi::OsString::new();
-    arg.push("buildDir=");
-    arg.push(path_build.as_path());
-    cmd.arg("--project-prop");
-    cmd.arg(arg);
+    cmd_gradle_project_prop(&mut cmd, "buildDir", &path_build);
     path_build.pop();
 
     cmd.stderr(std::process::Stdio::inherit());
