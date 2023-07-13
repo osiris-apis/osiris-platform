@@ -32,6 +32,13 @@ impl Error {
     }
 }
 
+// Append a path to the current working directory.
+fn cwd_path(path: &dyn AsRef<std::path::Path>) -> std::path::PathBuf {
+    let mut cwd = std::env::current_dir().expect("Cannot query current working directory");
+    cwd.push(path);
+    cwd
+}
+
 // Add Gradle `KEY=VALUE` to command-line.
 fn cmd_gradle_key_value(
     cmd: &mut std::process::Command,
@@ -69,6 +76,7 @@ fn cmd_gradle_system_prop(
 // Android-specific backend to `build()`.
 fn build_android(
     manifest: &crate::manifest::Manifest,
+    metadata: &crate::cargo::Metadata,
     _platform: &crate::manifest::RawPlatform,
     android: &crate::manifest::RawPlatformAndroid,
     path_platform: std::path::PathBuf,
@@ -166,6 +174,13 @@ fn build_android(
         &mut cmd,
         "osiris.android.versionName",
         &view_android.version_name,
+    );
+
+    // Write `osiris.metadata.*` properties.
+    cmd_gradle_project_prop(
+        &mut cmd,
+        "osiris.metadata.targetDirectory",
+        &cwd_path(&metadata.target_directory),
     );
 
     cmd.stderr(std::process::Stdio::inherit());
@@ -274,7 +289,7 @@ pub fn build(
     // it can reuse it for further operations.
     match platform.configuration {
         Some(crate::manifest::RawPlatformConfiguration::Android(ref v)) => {
-            build_android(manifest, platform, v, path_platform, path_build)
+            build_android(manifest, metadata, platform, v, path_platform, path_build)
         },
         None => Ok(()),
     }
