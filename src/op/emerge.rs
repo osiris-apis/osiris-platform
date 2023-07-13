@@ -25,6 +25,14 @@ pub enum Error {
     FileRemoval(std::ffi::OsString, std::io::Error),
 }
 
+// Escape XML PCDATA
+//
+// Ensure `data` is suitably escaped to be used verbatim in XML PCDATA.
+fn escape_xml_pcdata(data: &str) -> String {
+    data.replace("&", "&amp;")
+        .replace("<", "&lt;")
+}
+
 // Ensure directory exists
 //
 // Make sure the directory at the given path exists. Create the directory and
@@ -381,7 +389,7 @@ fn emerge_android_strings(
             "    <string name=\"app_name\">{0}</string>\n",
             "</resources>\n",
         ),
-        name,
+        escape_xml_pcdata(name),
     );
     path.push("strings.xml");
     update_file(path.as_path(), content.as_str())?;
