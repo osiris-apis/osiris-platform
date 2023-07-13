@@ -7,6 +7,13 @@
 use serde;
 use toml;
 
+/// View Generation Errors
+pub enum ErrorView {
+    /// Specified key is required but missing. `.<key>` is used for relative
+    /// keys, `<path>.<key>` for absolute keys.
+    MissingKey(&'static str),
+}
+
 /// Raw Manifest Application Table
 ///
 /// Sub-type of `Raw` representing the `Application` table. This contains all
@@ -93,6 +100,48 @@ pub struct Raw {
     pub platform: Vec<RawPlatform>,
 }
 
+/// Manifest View of `RawApplication`
+///
+/// This is a view of `RawApplication` with suitable defaults and generated
+/// variants.
+pub struct ViewApplication {
+    /// Same as `RawApplication.id`
+    pub id: String,
+    /// Same as `RawApplication.name`
+    pub name: String,
+    /// Same as `RawApplication.path`
+    pub path: String,
+
+    /// Valid symbol name generated from the ID.
+    pub symbol: String,
+}
+
+/// Manifest View of `RawPlatformAndroid`
+///
+/// This is a view of `RawPlatformAndroid` with suitable defaults based on
+/// the entire raw manifest.
+pub struct ViewPlatformAndroid {
+    /// Same as `RawPlatformAndroid.application_id`.
+    pub application_id: String,
+    /// Same as `RawPlatformAndroid.namespace`.
+    pub namespace: String,
+
+    /// Same as `RawPlatformAndroid.compile_sdk`.
+    pub compile_sdk: u32,
+    /// Same as `RawPlatformAndroid.min_sdk`.
+    pub min_sdk: u32,
+    /// Same as `RawPlatformAndroid.target_sdk`.
+    pub target_sdk: u32,
+
+    /// Same as `RawPlatformAndroid.version_code`.
+    pub version_code: u32,
+    /// Same as `RawPlatformAndroid.version_name`.
+    pub version_name: String,
+
+    /// Same as `RawPlatformAndroid.sdk_path`.
+    pub sdk_path: String,
+}
+
 /// Manifest Abstraction
 ///
 /// This type represents a valid and verified manifest. The manifest content
@@ -101,6 +150,154 @@ pub struct Raw {
 pub struct Manifest {
     /// Raw manifest content as parsed by the TOML module.
     pub raw: Raw,
+}
+
+impl RawApplication {
+    /// Create View
+    ///
+    /// Create a new view of this `RawApplication` instance. This will
+    /// pick suitable defaults for missing values and generate variants of
+    /// the input values used throughout the code-base.
+    pub fn view(
+        &self,
+    ) -> Result<ViewApplication, ErrorView> {
+        // They application ID is required. We cannot generate it or create
+        // a suitable default. A lot of other symbols depend on it, and we do
+        // not provide a filler. The user can do that, if they wish.
+        let v_id = self.id
+            .as_ref()
+            .ok_or(ErrorView::MissingKey(".id"))?;
+
+        // Use the application ID as name if none is given.
+        let v_name = self.name.as_ref().unwrap_or(&v_id);
+
+        // The default path to the application is the manifest directory.
+        let v_path = self.path
+            .as_ref()
+            .map(|v| v.as_str())
+            .unwrap_or(".");
+
+        // Create a symbol-name from the application ID. This replaces
+        // non-allowed characters with underscores and prepends an underscore
+        // if it starts with a digit. This follows common rules for symbol
+        // identifiers and should be valid for a wide range of targets.
+        let mut v_symbol = v_id.replace("-", "_");
+        if v_symbol
+            .chars().next().expect("Application ID cannot be empty")
+            .is_numeric()
+        {
+            v_symbol.insert(0, '_');
+        }
+
+        Ok(ViewApplication {
+            id: v_id.clone(),
+            name: v_name.clone(),
+            path: v_path.to_string(),
+
+            symbol: v_symbol,
+        })
+    }
+}
+
+impl RawPlatformAndroid {
+    /// Create View
+    ///
+    /// Create a new view of this `RawPlatformAndroid` instance. This will
+    /// pick suitable defaults for missing values.
+    pub fn view(
+        &self,
+        raw: &Raw,
+    ) -> Result<ViewPlatformAndroid, ErrorView> {
+        // Java uses reverse-domain paths for all source files. We really need
+        // a namespace for the application. We could use `org.example` or
+        // `foo.osiris`, but those might show up in the final APK, so we want
+        // to avoid it. The user can still specify those if they desire.
+        let v_namespace = self.namespace
+            .as_ref()
+            .ok_or(ErrorView::MissingKey(".namespace"))?;
+
+        // The application ID identifies the application in the different app
+        // stores and must be unique. Any changes to the ID will cause the
+        // application to be considered different to the original. Hence, the
+        // value should be specified explicitly. If not set, we generate it
+        // from the namespace and the base application ID.
+        let v_application_id =
+            if let Some(v) = self.application_id.as_ref() {
+                v
+            } else {
+                raw.application
+                    .as_ref()
+                    .and_then(|v| v.id.as_ref())
+                    .ok_or(ErrorView::MissingKey(".application-id"))?
+            };
+
+        // `min-sdk` specifies the minimum SDK version required. `target-sdk`
+        // specifies the SDK the application is designed for, and `compile-sdk`
+        // is the SDK version the build-tools used at compile time. The latter
+        // does not end up in the artifacts and is purely an input to the
+        // build tools. It should match `target-sdk`.
+        // If any of the three is given, we can pick the others. Note that they
+        // are `min <= target <= compile`.
+        let (v_min_sdk, v_target_sdk, v_compile_sdk) =
+            match (self.min_sdk, self.target_sdk, self.compile_sdk) {
+                (None, None, None) => {
+                    return Err(ErrorView::MissingKey(".min-sdk"));
+                },
+                (Some(min), None, None) => {
+                    (min, min, min)
+                },
+                (None, Some(tar), None) => {
+                    (tar, tar, tar)
+                },
+                (None, None, Some(com)) => {
+                    (com, com, com)
+                },
+                (Some(min), Some(tar), None) => {
+                    (min, tar, tar)
+                },
+                (Some(min), None, Some(com)) => {
+                    (min, com, com)
+                },
+                (None, Some(tar), Some(com)) => {
+                    (tar, tar, com)
+                },
+                (Some(min), Some(tar), Some(com)) => {
+                    (min, tar, com)
+                },
+            };
+
+        // The version-code is a simple positive integer increased for every
+        // new build. It allows the app stores to identify the builds and
+        // decide which one is the most recent. The code has no other meaning.
+        // The version-name is used as user-visible version and purely meant
+        // as human-readable identification of the version.
+        // We can use `1` and `0.1.0` as safe default values, if not provided.
+        let v_version_code = self.version_code.unwrap_or(1);
+        let v_version_name = self.version_name
+            .as_ref()
+            .map(|v| v.as_str())
+            .unwrap_or("0.1.0");
+
+        // We require a path to the Android SDK to build the application. There
+        // is no way to guess this path, nor are there any suitable defaults.
+        let v_sdk_path = self.sdk_path
+            .as_ref()
+            .ok_or(ErrorView::MissingKey("sdk-path"))?;
+
+        Ok(ViewPlatformAndroid {
+            application_id: v_application_id.clone(),
+            namespace: v_namespace.clone(),
+
+            compile_sdk: v_compile_sdk,
+            min_sdk: v_min_sdk,
+            target_sdk: v_target_sdk,
+
+            version_code: v_version_code,
+            version_name: v_version_name.to_string(),
+
+            sdk_path: v_sdk_path.clone(),
+        })
+    }
 }
 
 impl RawPlatform {
