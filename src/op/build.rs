@@ -136,6 +136,22 @@ fn build_android(
     );
 
     //
+    // Write `osiris.application.*` properties.
+    //
+
+    cmd_gradle_project_prop(
+        &mut cmd,
+        "osiris.application.packageSymbol",
+        &view_application.package_symbol,
+    );
+
+    cmd_gradle_project_prop(
+        &mut cmd,
+        "osiris.application.path",
+        &manifest.absolute_path(&view_application.path),
+    );
+
+    //
     // Write `osiris.android.*` properties.
     //
 
@@ -168,6 +184,12 @@ fn build_android(
 
     cmd_gradle_project_prop(
         &mut cmd,
+        "osiris.android.ndkLevel",
+        &view_android.ndk_level.to_string(),
+    );
+
+    cmd_gradle_project_prop(
+        &mut cmd,
         "osiris.android.versionCode",
         &view_android.version_code.to_string(),
     );
@@ -175,6 +197,12 @@ fn build_android(
         &mut cmd,
         "osiris.android.versionName",
         &view_android.version_name,
+    );
+
+    cmd_gradle_project_prop(
+        &mut cmd,
+        "osiris.android.abis",
+        &view_android.abis.join(";"),
     );
 
     //
