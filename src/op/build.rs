@@ -216,12 +216,15 @@ pub fn build(
     metadata: &crate::cargo::Metadata,
     platform: &crate::manifest::RawPlatform,
 ) -> Result<(), Error> {
+    let view_platform = platform.view()
+        .map_err(Error::from_manifest_error_view)?;
+
     let mut path_platform = std::path::PathBuf::new();
     let mut path_build = std::path::PathBuf::new();
 
-    // Check for `./platform/<id>/` to exist and being accessible. Use the
+    // Check for the platform path to exist and being accessible. Use the
     // path as specified in the manifest.
-    path_platform.push(platform.path());
+    path_platform.push(&manifest.absolute_path(&view_platform.path));
     let accessible = match std::fs::metadata(&path_platform) {
         Err(v) => {
             if v.kind() == std::io::ErrorKind::NotFound {
@@ -239,7 +242,7 @@ pub fn build(
         }
     };
 
-    // If `./platform/<platform>/` does not exist, create it in the build-root
+    // If the platform path does not exist, create it in the build-root
     // and emerge ephemeral platform integration into it. The directory is
     // created at `<target>/osiris/platform/<platform>/`.
     if !accessible {

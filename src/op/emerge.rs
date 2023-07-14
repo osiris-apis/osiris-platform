@@ -512,6 +512,9 @@ pub fn emerge(
     path_override: Option<&std::path::Path>,
     update: bool,
 ) -> Result<(), Error> {
+    let view_platform = platform.view()
+        .map_err(Error::from_manifest_error_view)?;
+
     let v_platform_path;
     let mut path = std::path::PathBuf::new();
 
@@ -521,7 +524,7 @@ pub fn emerge(
     let platform_path = if let Some(path_base) = path_override {
         path_base
     } else {
-        v_platform_path = platform.path();
+        v_platform_path = manifest.absolute_path(&view_platform.path);
         v_platform_path.as_ref()
     };
 

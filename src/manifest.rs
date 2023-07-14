@@ -154,6 +154,17 @@ pub struct ViewPlatformAndroid {
     pub sdk_path: String,
 }
 
+/// Manifest View of `RawPlatform`
+///
+/// This is a view of `RawPlatform` with suitable defaults based on the entire
+/// raw manifest.
+pub struct ViewPlatform {
+    /// Same as `RawPlatform.id`.
+    pub id: String,
+    /// Same as `RawPlatform.path`.
+    pub path: String,
+}
+
 /// Manifest Abstraction
 ///
 /// This type represents a valid and verified manifest. The manifest content
@@ -333,16 +344,28 @@ impl RawPlatform {
         }
     }
 
-    /// Return `platform.path` or its default
+    /// Create View
     ///
-    /// Return the configured platform path, or its default value if missing.
-    /// The default is `./platform/<id>` with `platform.id` as directory name.
-    pub fn path(&self) -> String {
-        if let Some(path) = self.path.as_ref() {
+    /// Create a new view of this `RawPlatform` instance. This will pick
+    /// suitable defaults for missing values.
+    pub fn view(
+        &self,
+    ) -> Result<ViewPlatform, ErrorView> {
+        // The ID is always present. Nothing to normalize here.
+        let v_id = &self.id;
+
+        // Provide a default path based on the platform ID, if none is
+        // specified in the manifest.
+        let v_path = if let Some(path) = self.path.as_ref() {
             path.clone()
         } else {
-            format!("./platform/{}", self.id)
-        }
+            format!("platform/{}", v_id)
+        };
+
+        Ok(ViewPlatform {
+            id: v_id.clone(),
+            path: v_path,
+        })
     }
 }
 
