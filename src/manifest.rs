@@ -52,6 +52,7 @@ pub struct RawPlatformAndroid {
     pub min_sdk: Option<u32>,
     pub target_sdk: Option<u32>,
 
+    pub abis: Option<Vec<String>>,
     pub ndk_level: Option<u32>,
 
     pub version_code: Option<u32>,
@@ -142,6 +143,8 @@ pub struct ViewPlatformAndroid {
     /// Same as `RawPlatformAndroid.target_sdk`.
     pub target_sdk: u32,
 
+    /// Same as `RawPlatformAndroid.abis`.
+    pub abis: Vec<String>,
     /// Same as `RawPlatformAndroid.ndk_level`.
     pub ndk_level: u32,
 
@@ -289,6 +292,15 @@ impl RawPlatformAndroid {
                 },
             };
 
+        // Let the user select the Android ABIs to build for. If it is not
+        // specified, we provide the default set with all ABIs.
+        let v_abis = if let Some(v) = self.abis.as_ref() {
+            v.clone()
+        } else {
+            ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"]
+                .iter().map(|v| v.to_string()).collect()
+        };
+
         // We must know the NDK level we build against. While we could pick a
         // suitable default, we really want the caller to decide on a version
         // so they know what they link against.
@@ -321,6 +333,7 @@ impl RawPlatformAndroid {
             min_sdk: v_min_sdk,
             target_sdk: v_target_sdk,
 
+            abis: v_abis,
             ndk_level: v_ndk_level,
 
             version_code: v_version_code,
