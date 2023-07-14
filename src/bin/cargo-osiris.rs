@@ -93,7 +93,7 @@ impl Cli {
 
         // Parse the manifest from the path.
         let manifest = osiris_platform::manifest::Manifest::parse_path(
-            std::path::Path::new(manifest_path)
+            &std::path::Path::new(manifest_path)
         );
         match manifest {
             Err(_) => {

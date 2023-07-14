@@ -160,6 +160,8 @@ pub struct ViewPlatformAndroid {
 /// can be directly accessed via the `raw` field. The data is verified for
 /// semantic correctness (unlike the `Raw` type).
 pub struct Manifest {
+    /// Absolute path to the manifest, required to anchor relative paths.
+    pub manifest_path: std::path::PathBuf,
     /// Raw manifest content as parsed by the TOML module.
     pub raw: Raw,
 }
@@ -414,7 +416,7 @@ impl Manifest {
     /// Take a raw representation of the manifest and perform post-parsing
     /// validation, ensuring the final manifest will not contain invalid
     /// entries.
-    fn parse_raw(raw: Raw) -> Result<Self, ()> {
+    fn parse_raw(path: &dyn AsRef<std::path::Path>, raw: Raw) -> Result<Self, ()> {
         // We only support version '1'. Any other version number is explicitly
         // defined to be incompatible, so fail parsing.
         //
@@ -477,8 +479,18 @@ impl Manifest {
             }
         }
 
+        // Turn the possibly relative manifest path into an absolute path so we
+        // can use it to extract paths out of the manifest for external use. We
+        // drop the file-name from the path, since we are only interested in
+        // the directory of the manifest.
+        let mut v_path = std::env::current_dir()
+            .expect("Cannot query current working directory");
+        v_path.push(path.as_ref());
+        v_path.pop();
+
         Ok(
             Self {
+                manifest_path: v_path,
                 raw: raw,
             }
         )
@@ -488,10 +500,10 @@ impl Manifest {
     ///
     /// Parse the given string as a literal manifest in TOML representation.
     /// Content is verified and invalid manifests are refused.
-    pub fn parse_str(content: &str) -> Result<Self, ()> {
+    pub fn parse_str(path: &dyn AsRef<std::path::Path>, content: &str) -> Result<Self, ()> {
         Raw::parse_str(content)
             .map_err(|_| ())
-            .and_then(|v| Self::parse_raw(v))
+            .and_then(|v| Self::parse_raw(path, v))
     }
 
     /// Parse manifest from file-system
@@ -499,10 +511,23 @@ impl Manifest {
     /// Open the specified file and parse it as a manifest. The content is
     /// verified and invalid manifests are refused. The file is completely
     /// parsed into memory and then closed again before the function returns.
-    pub fn parse_path(path: &std::path::Path) -> Result<Self, ()> {
+    pub fn parse_path(path: &dyn AsRef<std::path::Path>) -> Result<Self, ()> {
         std::fs::read_to_string(path)
             .map_err(|_| ())
-            .and_then(|v| Self::parse_str(&v))
+            .and_then(|v| Self::parse_str(path, &v))
+    }
+
+    /// Turn an embedded path into an absolute path
+    ///
+    /// All paths in a manifest are relative to the location of the manifest,
+    /// which itself is relative to the current working directory. This
+    /// function converts a path from the manifest into an absolute path that
+    /// can be used disconnected from the manifest.
+    pub fn absolute_path(&self, path: &dyn AsRef<std::path::Path>) -> std::path::PathBuf {
+        let mut v = std::path::PathBuf::new();
+        v.push(&self.manifest_path);
+        v.push(path.as_ref());
+        v
     }
 }
 
@@ -532,6 +557,29 @@ mod tests {
         Raw::parse_str(s).unwrap();
     }
 
+    // Verify path converter
+    //
+    // Verify the path converter of manifests and that it correctly tracks
+    // the manifest path and concatenates it with the current working directoy.
+    #[test]
+    fn manifest_absolute_path() {
+        let s = "version = 1";
+        let m = Manifest::parse_str(&"foo/bar/manifest.toml", s).unwrap();
+        let mut p = std::env::current_dir().unwrap();
+        p.push("foo/bar");
+
+        assert_eq!(&m.absolute_path(&"."), &p);
+
+        p.push("file.txt");
+        assert_eq!(&m.absolute_path(&"file.txt"), &p);
+        p.pop();
+
+        p.push("some/file.txt");
+        assert_eq!(&m.absolute_path(&"some/file.txt"), &p);
+        p.pop();
+        p.pop();
+    }
+
     // Verify basic parsing of `Manifest`
     //
     // Parse a minimal manifest into `Manifest` to have a base-level test for
@@ -540,7 +588,7 @@ mod tests {
     fn manifest_parse_minimal() {
         let s = "version = 1";
 
-        Manifest::parse_str(s).unwrap();
+        Manifest::parse_str(&".", s).unwrap();
     }
 
     // Verify parsing of unknown manifest versions
@@ -551,7 +599,7 @@ mod tests {
     fn manifest_parse_unknown_version() {
         let s = "version = 2";
 
-        assert!(Manifest::parse_str(s).is_err());
+        assert!(Manifest::parse_str(&".", s).is_err());
     }
 
     // Verify simple parsing of `Manifest`
@@ -570,7 +618,7 @@ mod tests {
             path = \"./platform/foobar\"
         ";
 
-        let m = Manifest::parse_str(s).unwrap();
+        let m = Manifest::parse_str(&".", s).unwrap();
 
         assert_eq!(m.raw.version, 1);
         assert_eq!(m.raw.application.unwrap().path.unwrap(), ".");
@@ -589,7 +637,7 @@ mod tests {
             name = \"Foo Bar\"
         ";
 
-        let m = Manifest::parse_str(s).unwrap();
+        let m = Manifest::parse_str(&".", s).unwrap();
         assert_eq!(m.raw.application.unwrap().name.unwrap(), "Foo Bar");
 
         let s = "
@@ -598,7 +646,7 @@ mod tests {
             name = \"Foo\"Bar\"
         ";
 
-        assert!(Manifest::parse_str(s).is_err());
+        assert!(Manifest::parse_str(&".", s).is_err());
     }
 
     // Verify parsing of manifest application ids
@@ -613,7 +661,7 @@ mod tests {
             id = \"_foobar0\"
         ";
 
-        let m = Manifest::parse_str(s).unwrap();
+        let m = Manifest::parse_str(&".", s).unwrap();
         assert_eq!(m.raw.application.unwrap().id.unwrap(), "_foobar0");
 
         let s = "
@@ -622,7 +670,7 @@ mod tests {
             id = \"\"
         ";
 
-        assert!(Manifest::parse_str(s).is_err());
+        assert!(Manifest::parse_str(&".", s).is_err());
     }
 
     // Verify parsing of android platform sdk-paths
@@ -639,7 +687,7 @@ mod tests {
             sdk-path = \"./some/path\"
         ";
 
-        let m = Manifest::parse_str(s).unwrap();
+        let m = Manifest::parse_str(&".", s).unwrap();
         assert_eq!(m.raw.platform[0].android().unwrap().sdk_path.as_ref().unwrap(), "./some/path");
 
         let s = "
@@ -650,6 +698,6 @@ mod tests {
             sdk-path = \"./some\npath\"
         ";
 
-        assert!(Manifest::parse_str(s).is_err());
+        assert!(Manifest::parse_str(&".", s).is_err());
     }
 }
