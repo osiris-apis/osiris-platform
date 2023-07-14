@@ -32,13 +32,6 @@ impl Error {
     }
 }
 
-// Append a path to the current working directory.
-fn cwd_path(path: &dyn AsRef<std::path::Path>) -> std::path::PathBuf {
-    let mut cwd = std::env::current_dir().expect("Cannot query current working directory");
-    cwd.push(path);
-    cwd
-}
-
 // Add Gradle `KEY=VALUE` to command-line.
 fn cmd_gradle_key_value(
     cmd: &mut std::process::Command,
@@ -105,7 +98,10 @@ fn build_android(
     // Set the SDK path via `ANDROID_HOME`. This is required by the Android SDK
     // Gradle build. Alternatively, this can be set via `local.properties`, but
     // Gradle has no official support for this, so we avoid it.
-    cmd.env("ANDROID_HOME", &view_android.sdk_path);
+    cmd.env(
+        "ANDROID_HOME",
+        &manifest.absolute_path(&view_android.sdk_path),
+    );
 
     cmd.arg("build");
 
@@ -188,7 +184,7 @@ fn build_android(
     cmd_gradle_project_prop(
         &mut cmd,
         "osiris.metadata.targetDirectory",
-        &cwd_path(&metadata.target_directory),
+        &metadata.target_directory,
     );
 
     cmd.stderr(std::process::Stdio::inherit());
