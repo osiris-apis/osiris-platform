@@ -30,6 +30,9 @@ pub struct RawApplication {
     pub name: Option<String>,
     /// Path to the application root relative from the manifest.
     pub path: Option<String>,
+
+    /// Name of the Cargo package that implements the application entry-point.
+    pub package: Option<String>,
 }
 
 /// Android-Platform Table
@@ -48,6 +51,8 @@ pub struct RawPlatformAndroid {
     pub compile_sdk: Option<u32>,
     pub min_sdk: Option<u32>,
     pub target_sdk: Option<u32>,
+
+    pub ndk_level: Option<u32>,
 
     pub version_code: Option<u32>,
     pub version_name: Option<String>,
@@ -107,13 +112,17 @@ pub struct Raw {
 pub struct ViewApplication {
     /// Same as `RawApplication.id`
     pub id: String,
+    /// Valid symbol name generated from the ID.
+    pub id_symbol: String,
     /// Same as `RawApplication.name`
     pub name: String,
     /// Same as `RawApplication.path`
     pub path: String,
 
-    /// Valid symbol name generated from the ID.
-    pub symbol: String,
+    /// Same as `RawApplication.package`
+    pub package: String,
+    /// Valid symbol name generated from the package name.
+    pub package_symbol: String,
 }
 
 /// Manifest View of `RawPlatformAndroid`
@@ -132,6 +141,9 @@ pub struct ViewPlatformAndroid {
     pub min_sdk: u32,
     /// Same as `RawPlatformAndroid.target_sdk`.
     pub target_sdk: u32,
+
+    /// Same as `RawPlatformAndroid.ndk_level`.
+    pub ndk_level: u32,
 
     /// Same as `RawPlatformAndroid.version_code`.
     pub version_code: u32,
@@ -167,6 +179,7 @@ impl RawApplication {
         let v_id = self.id
             .as_ref()
             .ok_or(ErrorView::MissingKey(".id"))?;
+        let v_id_symbol = crate::util::symbolize(v_id);
 
         // Use the application ID as name if none is given.
         let v_name = self.name.as_ref().unwrap_or(&v_id);
@@ -177,24 +190,21 @@ impl RawApplication {
             .map(|v| v.as_str())
             .unwrap_or(".");
 
-        // Create a symbol-name from the application ID. This replaces
-        // non-allowed characters with underscores and prepends an underscore
-        // if it starts with a digit. This follows common rules for symbol
-        // identifiers and should be valid for a wide range of targets.
-        let mut v_symbol = v_id.replace("-", "_");
-        if v_symbol
-            .chars().next().expect("Application ID cannot be empty")
-            .is_numeric()
-        {
-            v_symbol.insert(0, '_');
-        }
+        // The package name is required to know which Rust package contains
+        // the main application entry-point.
+        let v_package = self.package
+            .as_ref()
+            .ok_or(ErrorView::MissingKey(".package"))?;
+        let v_package_symbol = crate::util::symbolize(v_package);
 
         Ok(ViewApplication {
             id: v_id.clone(),
+            id_symbol: v_id_symbol,
             name: v_name.clone(),
             path: v_path.to_string(),
 
-            symbol: v_symbol,
+            package: v_package.clone(),
+            package_symbol: v_package_symbol,
         })
     }
 }
@@ -266,6 +276,12 @@ impl RawPlatformAndroid {
                 },
             };
 
+        // We must know the NDK level we build against. While we could pick a
+        // suitable default, we really want the caller to decide on a version
+        // so they know what they link against.
+        let v_ndk_level = self.ndk_level
+            .ok_or(ErrorView::MissingKey(".ndk-level"))?;
+
         // The version-code is a simple positive integer increased for every
         // new build. It allows the app stores to identify the builds and
         // decide which one is the most recent. The code has no other meaning.
@@ -282,7 +298,7 @@ impl RawPlatformAndroid {
         // is no way to guess this path, nor are there any suitable defaults.
         let v_sdk_path = self.sdk_path
             .as_ref()
-            .ok_or(ErrorView::MissingKey("sdk-path"))?;
+            .ok_or(ErrorView::MissingKey(".sdk-path"))?;
 
         Ok(ViewPlatformAndroid {
             application_id: v_application_id.clone(),
@@ -291,6 +307,8 @@ impl RawPlatformAndroid {
             compile_sdk: v_compile_sdk,
             min_sdk: v_min_sdk,
             target_sdk: v_target_sdk,
+
+            ndk_level: v_ndk_level,
 
             version_code: v_version_code,
             version_name: v_version_name.to_string(),
