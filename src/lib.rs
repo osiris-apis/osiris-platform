@@ -69,6 +69,8 @@
 //!  * Web (WIP)
 //!  * Windows (WIP)
 
+mod util;
+
 pub mod cargo;
 pub mod manifest;
 
