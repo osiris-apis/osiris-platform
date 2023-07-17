@@ -84,7 +84,10 @@ impl Cli {
     fn manifest(
         &self,
         m: &clap::ArgMatches,
-    ) -> Result<osiris_platform::manifest::Manifest, u8> {
+    ) -> Result<
+        (osiris_platform::manifest::Manifest, osiris_platform::manifest::ViewApplication),
+        u8,
+    > {
         // Unwrap the manifest-path from the argument.
         let manifest_arg = m.get_raw("manifest");
         let mut manifest_iter = manifest_arg.expect("Cannot acquire manifest path");
@@ -94,23 +97,33 @@ impl Cli {
         // Parse the manifest from the path.
         let manifest = osiris_platform::manifest::Manifest::parse_path(
             &std::path::Path::new(manifest_path)
-        );
-        match manifest {
-            Err(_) => {
+        ).map_err(
+            |_| {
                 eprintln!("Cannot parse platform manifest {:?}: ...", manifest_path);
-                Err(1)
-            },
-            Ok(v) => {
-                Ok(v)
-            },
-        }
+                1
+            }
+        )?;
+
+        let view_application = manifest.raw.view_application().map_err(
+            |v| {
+                match v {
+                    osiris_platform::manifest::ErrorView::MissingKey(v) => {
+                        eprintln!("Cannot parse platform manifest: Missing configuration key '{}'", v);
+                        1
+                    },
+                }
+            }
+        )?;
+
+        Ok((manifest, view_application))
     }
 
     fn metadata(
         &self,
+        path: &std::path::Path,
     ) -> Result<osiris_platform::cargo::Metadata, u8> {
         // Query cargo for its metadata via `cargo metadata`.
-        match osiris_platform::cargo::Metadata::cargo() {
+        match osiris_platform::cargo::Metadata::cargo(&path) {
             Err(osiris_platform::cargo::Error::Standalone) => {
                 eprintln!("Cannot query cargo metadata: Not running as cargo sub-command");
                 Err(1)
@@ -162,8 +175,8 @@ impl Cli {
         m: &clap::ArgMatches,
         m_op: &clap::ArgMatches,
     ) -> Result<(), u8> {
-        let manifest = self.manifest(m)?;
-        let metadata = self.metadata()?;
+        let (manifest, view_application) = self.manifest(m)?;
+        let metadata = self.metadata(&manifest.absolute_path(&view_application.path))?;
         let platform = self.platform(m_op, &manifest)?;
 
         match osiris_platform::op::build::build(
@@ -210,7 +223,7 @@ impl Cli {
         m: &clap::ArgMatches,
         m_op: &clap::ArgMatches,
     ) -> Result<(), u8> {
-        let manifest = self.manifest(m)?;
+        let (manifest, _) = self.manifest(m)?;
         let platform = self.platform(m_op, &manifest)?;
         let update = *m_op.get_one("update").expect("Update-flag lacks a value");
 

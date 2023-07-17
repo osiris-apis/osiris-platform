@@ -43,7 +43,7 @@ impl Metadata {
     /// Invoke `cargo metadata` and parse all the cargo metadata into the
     /// `Metadata` object. Only the bits required by the crate are fetched,
     /// everything else is ignored.
-    pub fn cargo() -> Result<Self, Error> {
+    pub fn cargo(path: &dyn AsRef<std::path::Path>) -> Result<Self, Error> {
         // Get the path to cargo via the `CARGO` env var. This is always set by
         // cargo when running external sub-commands. If unset, it means this is
         // called outside cargo and we bail out.
@@ -58,6 +58,13 @@ impl Metadata {
             "--offline",
             "--quiet",
         ]);
+
+        // Append path to the manifest.
+        let mut path_manifest = std::path::PathBuf::new();
+        path_manifest.push(path.as_ref());
+        path_manifest.push("Cargo.toml");
+        cmd.arg("--manifest-path");
+        cmd.arg(&path_manifest);
 
         // Run cargo and verify it exited successfully.
         let output = cmd.output().map_err(|v| Error::Exec(v))?;
