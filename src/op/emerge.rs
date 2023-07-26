@@ -448,6 +448,7 @@ fn emerge_android_themes(
 fn emerge_android_main_activity(
     path: &mut std::path::PathBuf,
     namespace: &str,
+    package_symbol: &str,
 ) -> Result<(), Error> {
     let content = format!(
         concat!(
@@ -459,6 +460,10 @@ fn emerge_android_main_activity(
             "import android.os.Bundle;\n",
             "\n",
             "public class MainActivity extends AppCompatActivity {{\n",
+            "    static {{\n",
+            "        System.loadLibrary(\"{1}\");\n",
+            "    }}\n",
+            "\n",
             "    @Override\n",
             "    protected void onCreate(Bundle savedInstanceState) {{\n",
             "        super.onCreate(savedInstanceState);\n",
@@ -467,6 +472,7 @@ fn emerge_android_main_activity(
             "}}\n",
         ),
         namespace,
+        package_symbol,
     );
     path.push("MainActivity.java");
     update_file(path.as_path(), content.as_str())?;
@@ -530,7 +536,11 @@ fn emerge_android(
                     view_android.namespace.replace(".", "/"),
                 );
                 ensure_dir(ns_path.as_path())?;
-                emerge_android_main_activity(&mut ns_path, &view_android.namespace)?;
+                emerge_android_main_activity(
+                    &mut ns_path,
+                    &view_android.namespace,
+                    &view_application.package_symbol,
+                )?;
             }
             path.pop();
         }
