@@ -16,7 +16,8 @@ java = ["src/java"]
 res = ["src/res"]
 
 [dependencies]
-makepad-widgets = { path = "../../../../makepad/makepad/widgets", version = "0.3" }
+#makepad-widgets = { path = "../../../../makepad/makepad/widgets", version = "0.3" }
+makepad-widgets = "0.3"
 
 [lib]
 crate-type = ["lib", "cdylib"]
