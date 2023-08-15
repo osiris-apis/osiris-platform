@@ -1,3 +1,7 @@
+[workspace]
+default-members = ["."]
+members = [".", "lib/*"]
+
 [package]
 name = "osiris-platform"
 version = "0.1.0"

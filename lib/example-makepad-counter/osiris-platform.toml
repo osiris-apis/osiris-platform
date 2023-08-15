@@ -1,0 +1,25 @@
+version = 1
+
+[application]
+id = "example-makepad-counter"
+name = "UI Counter via Makepad"
+package = "example-makepad-counter"
+
+[[platform]]
+id = "android"
+
+[platform.android]
+application-id = "foo.osiris.example.MakepadCounter"
+namespace = "dev.makepad.android"
+
+compile-sdk = 33
+min-sdk = 29
+target-sdk = 33
+
+abis = ["arm64-v8a"]
+ndk-level = 21
+
+version-code = 1
+version-name = "1.0.0"
+
+#sdk-path = "/path/to/Android/Sdk"

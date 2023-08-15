@@ -1,0 +1,22 @@
+[package]
+name = "example-makepad-counter"
+publish = false
+version = "0.1.0"
+
+description = "UI Counter via Makepad"
+edition = "2021"
+homepage = "https://www.osiris.foo"
+license = "MIT OR Apache-2.0 OR LGPL-2.1-or-later"
+readme = "README.md"
+repository = "https://github.com/osiris-apis/osiris-platform"
+rust-version = "1.70"
+
+[package.metadata.osiris.android]
+java = ["src/java"]
+res = ["src/res"]
+
+[dependencies]
+makepad-widgets = { path = "../../../../makepad/makepad/widgets", version = "0.3" }
+
+[lib]
+crate-type = ["lib", "cdylib"]
