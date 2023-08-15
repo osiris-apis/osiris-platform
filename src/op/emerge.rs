@@ -262,6 +262,7 @@ fn emerge_android_build_gradle(
             "\n",
             "cargo {{\n",
             "    apiLevel = Integer.parseInt(project.property('osiris.android.minSdk'))\n",
+            "    extraCargoBuildArguments = ['--lib']\n",
             "    libname = project.property('osiris.application.packageSymbol')\n",
             "    module  = project.property('osiris.application.path')\n",
             "    targetDirectory = project.property('osiris.metadata.targetDirectory')\n",
