@@ -1,4 +1,5 @@
 //! Osiris Platform Integration
+//! ===========================
 //!
 //! The osiris platform module integrates rust applications with a wide range
 //! of target platforms, including mobile platforms like Android and iOS, as
@@ -51,7 +52,7 @@
 //! integration. The abstractions use the Osiris Platform Manifest for
 //! configuration. The manifest is a TOML-formatted file usually called
 //! `osiris-platform.toml` placed in the application repository. The
-//! `osiris-platform` command-line tool parses the manifest and uses it for
+//! `cargo-osiris` command-line tool parses the manifest and uses it for
 //! all of the platform abstractions. The manifest is required if any of the
 //! platform abstractions are used.
 //!
@@ -62,19 +63,20 @@
 //! is accompanied by documentation on how rust applications can be deployed,
 //! and which abstractions are supported by the platform module.
 //!
-//!  * [Android](platform::android)
-//!  * iOS (WIP)
-//!  * Linux (WIP)
-//!  * MacOS (WIP)
-//!  * Web (WIP)
-//!  * Windows (WIP)
+//!  * [Android App](platform::android)
+//!  * [iOS App] (WIP)
+//!  * [Linux Flatpak] (WIP)
+//!  * [Linux Snap] (WIP)
+//!  * [MacOS App] (WIP)
+//!  * [Web App] (WIP)
+//!  * [Windows App] (WIP)
 
 mod util;
 
 pub mod cargo;
 pub mod manifest;
 
-/// Platform Operations
+/// ## Platform Operations
 ///
 /// The `op` module is a collection of all operations that can be performed via
 /// the command-line interface. Each operation is implemented in a submodule
@@ -84,7 +86,7 @@ pub mod op {
     pub mod emerge;
 }
 
-/// Platform Integration
+/// ## Platform Integration
 ///
 /// The `platform` module documents how rust applications can be integrated
 /// into native applications for each respective platform.

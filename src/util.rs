@@ -1,9 +1,9 @@
-//! Utilities
+//! # Utilities
 //!
 //! A collection of small utilities that extend the Rust standard library with
 //! features required by this crate.
 
-/// Turn strings into valid symbol identifiers
+/// ## Turn strings into valid symbol identifiers
 ///
 /// Create a new string that has the same content as the input but all
 /// unsupported characters replaced by an underscore. Only alphanumeric
